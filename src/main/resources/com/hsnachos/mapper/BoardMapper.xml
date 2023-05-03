@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hsnachos.mapper.BoardMapper">
+	<sql id="search">
+		<trim prefix="AND (" suffix=")" prefixOverrides="or">
+				<foreach collection="typeArr" item="t" >
+					<trim prefix="or">
+						<choose>
+							<when test="t == 'T'.toString()">
+								title like CONCAT(CONCAT('%', #{keyword}), '%')
+							</when>
+							<when test="t == 'C'.toString()">
+								content like CONCAT(CONCAT('%', #{keyword}), '%')
+							</when>
+							<when test="t == 'W'.toString()">
+								writer like CONCAT(CONCAT('%', #{keyword}), '%')
+							</when>
+						</choose>
+					</trim>
+				</foreach>
+			</trim>
+	</sql>
+
+
+	<select id="getList" resultType="com.hsnachos.domain.BoardVO">
+		select * from tbl_board where bno > 0
+		<!-- select seq_board.nextval from dual -->
+	</select>
+	
+	<!--
+		이스케이프를 하기위한 방법
+		1. 엔티티코드 사용 ex) > 를 &lt;로 변경
+		2. CDATA 사용
+	-->
+	<select id="getListWithPaging" resultType="com.hsnachos.domain.BoardVO">
+		SELECT *
+		FROM TBL_BOARD tb
+		WHERE bno > 0
+		<include refid="search" />
+		order by bno desc
+		limit #{amount} offset #{offset}
+	</select>
+	
+	<!-- 파라미터 타입은 생략되어있음!! -->
+	<insert id="insert">
+		<!-- insert into tbl_board (bno, title, content, writer) values (nextval(seq_board), #{title}, #{content}, #{writer}) -->
+		insert into tbl_board (bno, title, content, writer) values (seq_board.nextval, #{title}, #{content}, #{writer})
+	</insert>
+	
+	<!-- 시퀀스가 아닌 auto increment의 경우엔 order을 after로 바꿔서 가져오면 된다!!, 글 작성시에 bno 입력도 사라져야함 -->
+	<insert id="insertSelectKey">
+		<selectKey keyProperty="bno" order="BEFORE" resultType="long">
+			select nextval(seq_board) from dual
+		</selectKey>
+		insert into tbl_board (bno, title, content, writer) values (#{bno}, #{title}, #{content}, #{writer})
+	</insert>
+	
+<!--	<select id="read" resultType="board">-->
+	<select id="read" resultMap="boardMap">
+<!--		select * from tbl_board where bno = #{bno}-->
+		select * from tbl_board LEFT JOIN TBL_ATTACH ta USING (bno) where bno = #{bno} order by odr
+	</select>
+
+	<resultMap id="boardMap" type="board">
+		<result property="bno" column="bno"/>
+		<result property="title" column="title"/>
+		<result property="content" column="content"/>
+		<result property="writer" column="writer"/>
+		<result property="regdate" column="regdate"/>
+		<result property="updatedate" column="updatedate"/>
+		<collection property="attachs" resultMap="attachMap" />
+	</resultMap>
+
+	<resultMap id="attachMap" type="attach">
+		<result property="uuid" column="uuid" />
+		<result property="path" column="path" />
+		<result property="name" column="name" />
+		<result property="image" column="image" />
+		<result property="bno" column="bno" />
+	</resultMap>
+	
+	<delete id="delete">
+		delete from tbl_board where bno = #{bno}
+	</delete>
+	
+	<update id="update">
+		update tbl_board set
+			title = #{title}
+			, content = #{content}
+			, writer = #{writer}
+			<!-- , updatedate = now() -->
+			, updatedate = sysdate
+			where bno = #{bno}
+	</update>
+	
+	<select id="getTotalCnt" resultType="int">
+		SELECT count(*)
+		FROM tbl_board
+		WHERE bno > 0
+		<include refid="search" />
+	</select>
+
+	<update id="updateReplyCnt">
+		update tbl_board set replyCnt = replyCnt + #{amount} where bno = #{bno}
+	</update>
+</mapper>
